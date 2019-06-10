@@ -17,7 +17,15 @@ namespace Sieve.Services
         {
         }
 
+        public SieveProcessor(IOptions<SieveOptions> options, ISieveTypeConverter typeConverter) : base(options, typeConverter)
+        {
+        }
+
         public SieveProcessor(IOptions<SieveOptions> options, ISieveCustomSortMethods customSortMethods) : base(options, customSortMethods)
+        {
+        }
+
+        public SieveProcessor(IOptions<SieveOptions> options, ISieveCustomSortMethods customSortMethods, ISieveTypeConverter typeConverter) : base(options, customSortMethods, typeConverter)
         {
         }
 
@@ -25,7 +33,15 @@ namespace Sieve.Services
         {
         }
 
+        public SieveProcessor(IOptions<SieveOptions> options, ISieveCustomFilterMethods customFilterMethods, ISieveTypeConverter typeConverter) : base(options, customFilterMethods, typeConverter)
+        {
+        }
+
         public SieveProcessor(IOptions<SieveOptions> options, ISieveCustomSortMethods customSortMethods, ISieveCustomFilterMethods customFilterMethods) : base(options, customSortMethods, customFilterMethods)
+        {
+        }
+
+        public SieveProcessor(IOptions<SieveOptions> options, ISieveCustomSortMethods customSortMethods, ISieveCustomFilterMethods customFilterMethods, ISieveTypeConverter typeConverter) : base(options, customSortMethods, customFilterMethods, typeConverter)
         {
         }
     }
@@ -38,7 +54,15 @@ namespace Sieve.Services
         {
         }
 
+        public SieveProcessor(IOptions<SieveOptions> options, ISieveTypeConverter typeConverter) : base(options, typeConverter)
+        {
+        }
+
         public SieveProcessor(IOptions<SieveOptions> options, ISieveCustomSortMethods customSortMethods) : base(options, customSortMethods)
+        {
+        }
+
+        public SieveProcessor(IOptions<SieveOptions> options, ISieveCustomSortMethods customSortMethods, ISieveTypeConverter typeConverter) : base(options, customSortMethods, typeConverter)
         {
         }
 
@@ -46,7 +70,15 @@ namespace Sieve.Services
         {
         }
 
+        public SieveProcessor(IOptions<SieveOptions> options, ISieveCustomFilterMethods customFilterMethods, ISieveTypeConverter typeConverter) : base(options, customFilterMethods, typeConverter)
+        {
+        }
+
         public SieveProcessor(IOptions<SieveOptions> options, ISieveCustomSortMethods customSortMethods, ISieveCustomFilterMethods customFilterMethods) : base(options, customSortMethods, customFilterMethods)
+        {
+        }
+
+        public SieveProcessor(IOptions<SieveOptions> options, ISieveCustomSortMethods customSortMethods, ISieveCustomFilterMethods customFilterMethods, ISieveTypeConverter typeConverter) : base(options, customSortMethods, customFilterMethods, typeConverter)
         {
         }
     }
@@ -60,6 +92,20 @@ namespace Sieve.Services
         private readonly ISieveCustomSortMethods _customSortMethods;
         private readonly ISieveCustomFilterMethods _customFilterMethods;
         private readonly SievePropertyMapper mapper = new SievePropertyMapper();
+        private readonly ISieveTypeConverter _typeConverter = new SieveTypeConverter();
+
+        public SieveProcessor(IOptions<SieveOptions> options,
+            ISieveCustomSortMethods customSortMethods,
+            ISieveCustomFilterMethods customFilterMethods,
+            ISieveTypeConverter typeConverter)
+        {
+            mapper = MapProperties(mapper);
+            _options = options;
+            _customSortMethods = customSortMethods;
+            _customFilterMethods = customFilterMethods;
+            _typeConverter = typeConverter;
+        }
+
 
         public SieveProcessor(IOptions<SieveOptions> options,
             ISieveCustomSortMethods customSortMethods,
@@ -72,6 +118,16 @@ namespace Sieve.Services
         }
 
         public SieveProcessor(IOptions<SieveOptions> options,
+            ISieveCustomSortMethods customSortMethods,
+            ISieveTypeConverter typeConverter)
+        {
+            mapper = MapProperties(mapper);
+            _options = options;
+            _customSortMethods = customSortMethods;
+            _typeConverter = typeConverter;
+        }
+
+        public SieveProcessor(IOptions<SieveOptions> options,
             ISieveCustomSortMethods customSortMethods)
         {
             mapper = MapProperties(mapper);
@@ -80,11 +136,28 @@ namespace Sieve.Services
         }
 
         public SieveProcessor(IOptions<SieveOptions> options,
+            ISieveCustomFilterMethods customFilterMethods,
+            ISieveTypeConverter typeConverter)
+        {
+            mapper = MapProperties(mapper);
+            _options = options;
+            _customFilterMethods = customFilterMethods;
+            _typeConverter = typeConverter;
+        }
+
+        public SieveProcessor(IOptions<SieveOptions> options,
             ISieveCustomFilterMethods customFilterMethods)
         {
             mapper = MapProperties(mapper);
             _options = options;
             _customFilterMethods = customFilterMethods;
+        }
+
+        public SieveProcessor(IOptions<SieveOptions> options, ISieveTypeConverter typeConverter)
+        {
+            mapper = MapProperties(mapper);
+            _options = options;
+            _typeConverter = typeConverter;
         }
 
         public SieveProcessor(IOptions<SieveOptions> options)
@@ -186,28 +259,29 @@ namespace Sieve.Services
                         {
                             propertyValue = Expression.PropertyOrField(propertyValue, part);
                         }
-                        
+
                         if (filterTerm.Values == null) continue;
 
                         foreach (var filterTermValue in filterTerm.Values)
                         {
-
-                            dynamic constantVal = converter.CanConvertFrom(typeof(string))
-                                                      ? converter.ConvertFrom(filterTermValue)
-                                                      : Convert.ChangeType(filterTermValue, property.PropertyType);
+                            dynamic constantVal = this._typeConverter.Convert(filterTermValue, property.PropertyType);
 
                             Expression filterValue = GetClosureOverConstant(constantVal, property.PropertyType);
 
 
                             if (filterTerm.OperatorIsCaseInsensitive)
                             {
-                                propertyValue = Expression.Call(propertyValue,
-                                    typeof(string).GetMethods()
-                                    .First(m => m.Name == "ToUpper" && m.GetParameters().Length == 0));
+                                var methdodInfo = typeof(string).GetMethod("ToUpper", new Type[] { });
 
-                                filterValue = Expression.Call(filterValue,
-                                    typeof(string).GetMethods()
-                                    .First(m => m.Name == "ToUpper" && m.GetParameters().Length == 0));
+                                propertyValue = Expression.Condition(
+                                    Expression.Equal(propertyValue, Expression.Constant(null)),
+                                    Expression.Call(Expression.Constant(string.Empty), methdodInfo),
+                                    Expression.Call(propertyValue, methdodInfo));
+
+                                filterValue = Expression.Condition(
+                                    Expression.Equal(filterValue, Expression.Constant(null)),
+                                    Expression.Call(Expression.Constant(string.Empty), methdodInfo),
+                                    Expression.Call(filterValue, methdodInfo));
                             }
 
                             var expression = GetExpression(filterTerm, filterValue, propertyValue);
@@ -229,7 +303,7 @@ namespace Sieve.Services
                     }
                     else
                     {
-                        result = ApplyCustomMethod(result, filterTermName, _customFilterMethods, 
+                        result = ApplyCustomMethod(result, filterTermName, _customFilterMethods,
                             new object[] {
                                             result,
                                             filterTerm.Operator,
@@ -358,13 +432,13 @@ namespace Sieve.Services
             string name)
         {
             var property = mapper.FindProperty<TEntity>(canSortRequired, canFilterRequired, name, _options.Value.CaseSensitive);
-            if(property.Item1 == null)
+            if (property.Item1 == null)
             {
                 var prop = FindPropertyBySieveAttribute<TEntity>(canSortRequired, canFilterRequired, name, _options.Value.CaseSensitive);
                 return (prop?.Name, prop);
             }
             return property;
-                
+
         }
 
         private PropertyInfo FindPropertyBySieveAttribute<TEntity>(
@@ -374,12 +448,12 @@ namespace Sieve.Services
             bool isCaseSensitive)
         {
             return Array.Find(typeof(TEntity).GetProperties(), p =>
-                {
-                    return p.GetCustomAttribute(typeof(SieveAttribute)) is SieveAttribute sieveAttribute
-                    && (canSortRequired ? sieveAttribute.CanSort : true)
-                    && (canFilterRequired ? sieveAttribute.CanFilter : true)
-                    && ((sieveAttribute.Name ?? p.Name).Equals(name, isCaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase));
-                });
+            {
+                return p.GetCustomAttribute(typeof(SieveAttribute)) is SieveAttribute sieveAttribute
+                && (canSortRequired ? sieveAttribute.CanSort : true)
+                && (canFilterRequired ? sieveAttribute.CanFilter : true)
+                && ((sieveAttribute.Name ?? p.Name).Equals(name, isCaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase));
+            });
         }
 
         private IQueryable<TEntity> ApplyCustomMethod<TEntity>(IQueryable<TEntity> result, string name, object parent, object[] parameters, object[] optionalParameters = null)
